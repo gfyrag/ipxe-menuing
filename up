@@ -3,15 +3,22 @@
 # Boot from IPXE (will not work from standard PXE)
 # Boot server will only provide iPXE menu
 
+# Setup PXE server => Will forward to our iPXE menuing server. Boot server does not provide any ipxe boot file, so client must boot from ipxe.
 # '--privileged' is required at this time (06/06/2015) because of apparmor issue (Check if changes) => https://github.com/docker/docker/issues/5490
-# 'http://172.17.42.1:8888' will not work as dhcp boot. Maybe iPXE check path of the url.
+# Just 'http://172.17.42.1:8888' as dhcp boot will not work, maybe iPXE check path of the url.
 DNSMASQ_ID=$(docker run -d --privileged -p 67:67/udp gfyrag/dnsmasq:x86_64 --dhcp-boot=http://172.17.42.1:8888/ --dhcp-no-override --dhcp-range=172.17.42.130,172.17.42.140 --dhcp-authoritative)
-IPXE_ID=$(docker run -t -d -p 8888:8888 -v $(pwd):/app gfyrag/ipxe:x86_64 -c /app/examples/example1.yml)
 
-# Need extra config
-# /etc/qemu/bridge.conf
+# Start our iPXE menuing server from any python3 image.
+IPXE_ID=$(docker run -t -d -p 8888:8888 -v $(pwd):/app --entrypoint sh dghubble/python3 -c "pip install -r /app/requirements && python3 /app/src/ipxe -c /app/examples/example1.yml")
+
+# Need extra config (Assuming docker use docker0 bridge) => This will plug qemu vm on the docker0 bridge.
+# /etc/qemu/bridge.conf :
+# ```
 # allow docker0
+# ```
+# 
 sudo qemu-system-x86_64 -m 1024 -device e1000,netdev=network0 -netdev bridge,br=docker0,id=network0
 
+# A bit of cleaning
 docker kill $DNSMASQ_ID && docker rm $DNSMASQ_ID
 docker kill $IPXE_ID && docker rm $IPXE_ID
