@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Boot from IPXE (will not work from standard PXE)
+# Boot server will only provide iPXE menu
+
+# '--privileged' is required at this time (06/06/2015) because of apparmor issue (Check if changes) => https://github.com/docker/docker/issues/5490
+# 'http://172.17.42.1:8888' will not work as dhcp boot. Maybe iPXE check path of the url.
+DNSMASQ_ID=$(docker run -d --privileged -p 67:67/udp gfyrag/dnsmasq:x86_64 --dhcp-boot=http://172.17.42.1:8888/ --dhcp-no-override --dhcp-range=172.17.42.130,172.17.42.140 --dhcp-authoritative)
+IPXE_ID=$(docker run -t -d -p 8888:8888 -v $(pwd):/app gfyrag/ipxe:x86_64 -c /app/examples/example1.yml)
+
+# Need extra config
+# /etc/qemu/bridge.conf
+# allow docker0
+sudo qemu-system-x86_64 -m 1024 -device e1000,netdev=network0 -netdev bridge,br=docker0,id=network0
+
+docker kill $DNSMASQ_ID && docker rm $DNSMASQ_ID
+docker kill $IPXE_ID && docker rm $IPXE_ID

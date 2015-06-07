@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+
+# iPXE menu example : https://gist.github.com/robinsmidsrod/2234639
+
+from http.server import HTTPServer
+from http.server import BaseHTTPRequestHandler
+from yaml import load as loadYaml
+from yaml.scanner import ScannerError as YamlScannerError
+from jinja2 import Template, TemplateSyntaxError
+from cli.app import CommandLineApp
+from os.path import abspath, dirname, join
+
+DEFAULT_TEMPLATE = "template"
+
+class MenuHandler(BaseHTTPRequestHandler):
+	def do_GET(self):
+		try:
+			with self.server.handle() as handle:
+				self.send_response(200)
+				self.end_headers()
+				self.wfile.write(handle.template.render(entries=handle.entries).encode('UTF-8'))
+		except Exception as e:
+			self.send_response(500)
+			print(e)
+
+class IpxeHttpServer(HTTPServer):
+
+	class ResourceHandler():
+		def __init__(self, configFile, templateFile):
+			self.configFile = configFile
+			self.templateFile = templateFile
+
+		def __enter__(self):
+			try:
+				self.configFileFd = open(self.configFile)
+				self.entries = loadYaml(self.configFileFd)
+			except IOError as e:
+				raise RuntimeError("Unable to open %s : %s" % (self.configFile, e.strerror))
+			except YamlScannerError as e:
+				raise RuntimeError("Unable to parse %s : %s" % (self.configFile, e))
+		
+			try:
+				self.templateFileFd = open(self.templateFile)
+				self.template = Template(self.templateFileFd.read())
+			except IOError as e:
+				raise RuntimeError("Unable to open %s : %s" % (self.templateFile, e.strerror))
+			except TemplateSyntaxError as e:
+				raise RuntimeError("Unable to parse %s : %s" % (self.templateFile, e))
+
+			return self
+
+		def __exit__(self, type, value, traceback):
+			self.entries = None
+			self.configFileFd.close()
+			self.template = None
+			self.templateFileFd.close()	
+
+	def __init__(self, params, classHandler, configFile, templateFile):
+		super(IpxeHttpServer, self).__init__(params, classHandler)
+		self.configFile = configFile
+		self.templateFile = abspath(templateFile)
+
+	def handle(self):
+		return IpxeHttpServer.ResourceHandler(self.configFile, self.templateFile)
+
+@CommandLineApp
+def ipxe(app):
+	if(app.params.config):
+		if(app.params.template):
+			templateFile = app.params.template
+		else:
+			templateFile = join(dirname(abspath(__file__)), DEFAULT_TEMPLATE)
+			
+		print("Starting server on port %d\r\n" % app.params.port)
+		httpd = IpxeHttpServer(("0.0.0.0", app.params.port), MenuHandler, app.params.config, templateFile)
+		httpd.serve_forever()
+	else:
+		print("Please provide a configuration file")
+
+ipxe.add_param("-c", "--config", help="Configuration file", default=False, type=str)
+ipxe.add_param("-t", "--template", help="Template file", default=False, type=str)
+ipxe.add_param("-p", "--port", help="Listening port", default=8888, type=int)
+ipxe.run()
