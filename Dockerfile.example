@@ -1,4 +1,0 @@
-FROM dghubble/python3
-ADD . /app
-RUN pip install -r /app/requirements
-ENTRYPOINT ["python3", "/app/src/ipxe", "-c", "/app/examples/example1.yml"]

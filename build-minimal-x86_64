@@ -1,0 +1,6 @@
+#!/bin/bash
+
+docker build -t gfyrag/ipxe-builder:x86_64 -f minimal-builder.Dockerfile .
+docker run gfyrag/ipxe-builder:x86_64 > rootfs.tar
+docker build -t gfyrag/ipxe:x86_64 -f minimal.Dockerfile .
+rm rootfs.tar
