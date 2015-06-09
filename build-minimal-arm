@@ -1,6 +1,6 @@
 #!/bin/bash
 
-docker build -t gfyrag/ipxe-builder:arm -f builder-arm.Dockerfile .
-docker run gfyrag/ipxe-builder:arm > rootfs.tar
-docker build -t gfyrag/ipxe:arm -f Dockerfile .
+docker build -t gfyrag/ipxe-menuing-builder:arm -f builder-arm.Dockerfile .
+docker run gfyrag/ipxe-menuing-builder:arm > rootfs.tar
+docker build -t gfyrag/ipxe-menuing:arm -f Dockerfile .
 rm rootfs.tar
